@@ -11,11 +11,7 @@
 
 namespace nvx
 {
-	
-	
-	
-	
-	
+
 class BitField: public std::vector<uint8_t>
 {
 public:
@@ -78,15 +74,9 @@ public:
 		return os;
 	}
 
-	NVX_SERIALIZABLE( &_bitsize, &(std::vector<uint8_t> &)*this );
-
 private:
 	int _bitsize = 0;
 };
-
-
-
-
 
 }
 
