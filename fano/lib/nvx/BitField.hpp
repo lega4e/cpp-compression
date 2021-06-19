@@ -45,7 +45,7 @@ public:
 
 		return;
 	}
-	
+
 	bool get(int n) const
 	{
 		return at(n/8) & (1 << n%8);

@@ -13,6 +13,8 @@
 #include <nvx/BitField.hpp>
 #include <nvx/serialization.hpp>
 
+#pragma GCC diagnostic ignored "-Wparentheses"
+
 constexpr unsigned int const CONTROL_NUMBER = 3247928473u;
 
 
@@ -27,7 +29,7 @@ namespace nvx
 {
 	template<typename Ostream, typename Meta>
 	int serialize(
-		nvx::archive<Ostream, Meta> &arch, 
+		nvx::archive<Ostream, Meta> &arch,
 		nvx::BitField const *obj,
 		bool write = true
 	)
@@ -39,7 +41,7 @@ namespace nvx
 
 	template<typename Ostream, typename Meta>
 	int deserialize(
-		nvx::archive<Ostream, Meta> &arch, 
+		nvx::archive<Ostream, Meta> &arch,
 		nvx::BitField *obj
 	)
 	{
@@ -91,6 +93,43 @@ bool count_cmp(item_t const &lhs, item_t const &rhs)
 
 
 /******************** ASSISTIVE FUNCTIONS *******************/
+void check_control_number(nvx::archive<istream> &arch)
+{
+	unsigned int contnum;
+	arch >> &contnum;
+	if (contnum != CONTROL_NUMBER)
+		throw "Decode error: fail check control number";
+	return;
+}
+
+void print_items(vector<item_t> const &items)
+{
+	int max = -1;
+	for (item_t const &item : items)
+	{
+		if ((int)item.key.size() > max)
+			max = (int)item.key.size();
+	}
+
+	char buf[32];
+	sprintf(buf, "%%-%is", max);
+	string
+		tabfmt = string("\\t  : ")  + buf + " (%i)\n",
+		nlnfmt = string("\\n  : ")  + buf + " (%i)\n",
+		deffmt = string("'%1lc' : ") + buf + " (%i)\n";
+	for (item_t const &item : items)
+	{
+		if (item.ch == '\t')
+			printf(tabfmt.c_str(), item.key.c_str(), item.c);
+		else if (item.ch == '\n')
+			printf(nlnfmt.c_str(), item.key.c_str(), item.c);
+		else if (item.ch != '\0')
+			printf(deffmt.c_str(), item.ch, item.key.c_str(), item.c);
+	}
+
+	return;
+}
+
 /*
  * Считать все данные из stdin в строку, одновременно
  * подсчитывая количество встречающихся символов
@@ -218,13 +257,8 @@ void decode()
 	nvx::BitField  bits;
 
 	{
-		unsigned int contnum;
 		nvx::archive arch(&cin);
-		arch >> &contnum;
-
-		if (contnum != CONTROL_NUMBER)
-			throw "Decode error: fail check control number";
-
+		check_control_number(arch);
 		arch >> &items >> &bits;
 	}
 
@@ -281,12 +315,41 @@ int main(int argc, char *argv[])
 			return 0;
 		}
 
-		if ( argc > 1 && !strcmp(argv[1], "-k") )
+		if ( argc > 1 && !strcmp(argv[1], "--keys-encoded") )
 		{
 			vector<item_t> items;
-			nvx::archive(&cin) >> &items;
-			// print items
+			nvx::archive   arch(&cin);
+			check_control_number(arch);
+			arch >> &items;
+			print_items(items);
+			return 0;
 		}
+
+		if ( argc > 1 && !strcmp(argv[1], "--keys-origin") )
+		{
+			vector<item_t> items;
+			wstring        data;
+			read_text(data, items);
+			calculate_keys(items);
+			print_items(items);
+			return 0;
+		}
+
+		if ( argc > 1 && (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help")) || argc == 1 )
+		{
+			wcout <<
+				"Usage: " << argv[0] << " [options]\n"
+				"Options:\n"
+				"  -e             : encode data from stdin and print it to stdout\n"
+				"  -d             : decode data from stdin and print it to stdout\n"
+				"  --keys-encoded : read encoded data and print keys\n"
+				"  --keys-origin  : read original data, calculate keys and print it\n" <<
+				"  -h, --help     : show this" <<
+			endl;
+			return 0;
+		}
+
+		wcout << "Invalid input: " << argv[1] << endl;
 	}
 	catch (char const *err)
 	{
@@ -294,7 +357,6 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	wcout << "Type -e to encode file, -d to decode, -k to print keys" << endl;
 
 	return 0;
 }
