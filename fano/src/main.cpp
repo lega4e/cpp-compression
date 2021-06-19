@@ -114,17 +114,21 @@ void print_items(vector<item_t> const &items)
 	char buf[32];
 	sprintf(buf, "%%-%is", max);
 	string
-		tabfmt = string("\\t  : ")  + buf + " (%i)\n",
-		nlnfmt = string("\\n  : ")  + buf + " (%i)\n",
-		deffmt = string("'%1lc' : ") + buf + " (%i)\n";
+		tabfmt = string("\\t  : ")   + buf + " (%i)\n",
+		nlnfmt = string("\\n  : ")   + buf + " (%i)\n",
+		gphfmt = string("'%1lc' : ") + buf + " (%i)\n",
+		nogfmt = string(" *  : ")    + buf + " (%i)\n";
+
 	for (item_t const &item : items)
 	{
-		if (item.ch == '\t')
+		if ( item.ch == '\t' )
 			printf(tabfmt.c_str(), item.key.c_str(), item.c);
-		else if (item.ch == '\n')
+		else if ( item.ch == '\n' )
 			printf(nlnfmt.c_str(), item.key.c_str(), item.c);
-		else if (item.ch != '\0')
-			printf(deffmt.c_str(), item.ch, item.key.c_str(), item.c);
+		else if ( !isgraph(item.ch) && item.ch != ' ' )
+			printf(nogfmt.c_str(), item.key.c_str(), item.c);
+		else
+			printf(gphfmt.c_str(), item.ch, item.key.c_str(), item.c);
 	}
 
 	return;
@@ -149,7 +153,6 @@ void read_text(wstring &data, vector<item_t> &items)
 	items.clear();
 	for (auto b = syms.begin(), e = syms.end(); b != e; ++b)
 		items.push_back( { "", b->first, b->second } );
-	items.push_back( { "", L'\0', 1 } );
 
 	return;
 }
@@ -160,7 +163,10 @@ void read_text(wstring &data, vector<item_t> &items)
 void calculate_keys(vector<item_t> &items)
 {
 	if (items.size() < 2)
+	{
+		items.front().key = "0";
 		return;
+	}
 
 	/*
 	 * Отсортировываем по убыванию частоты символа
@@ -201,11 +207,11 @@ void data2bitfield(wstring const &data, vector<item_t> &items, nvx::BitField &bi
 {
 	sort( items.begin(), items.end(), char_cmp );
 
-	for (auto ch = data.begin(), e = data.end(); ch != e+1; ++ch)
+	for (auto ch = data.begin(), e = data.end(); ch != e; ++ch)
 	{
 		auto it = lower_bound(
 			items.begin(), items.end(),
-			item_t { "", (ch == e ? '\0' : *ch), 0 }, char_cmp
+			item_t { "", *ch, 0 }, char_cmp
 		);
 
 		if (it == items.end() or it->ch != *ch)
@@ -283,9 +289,6 @@ void decode()
 			);
 		}
 		while ( it->key != key );
-
-		if (it->ch == '\0')
-			break;
 		wcout.put(it->ch);
 	}
 
@@ -321,6 +324,7 @@ int main(int argc, char *argv[])
 			nvx::archive   arch(&cin);
 			check_control_number(arch);
 			arch >> &items;
+			sort(items.rbegin(), items.rend(), count_cmp);
 			print_items(items);
 			return 0;
 		}
@@ -331,6 +335,7 @@ int main(int argc, char *argv[])
 			wstring        data;
 			read_text(data, items);
 			calculate_keys(items);
+			sort(items.rbegin(), items.rend(), count_cmp);
 			print_items(items);
 			return 0;
 		}
