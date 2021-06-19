@@ -125,7 +125,7 @@ void print_items(vector<item_t> const &items)
 			printf(tabfmt.c_str(), item.key.c_str(), item.c);
 		else if ( item.ch == '\n' )
 			printf(nlnfmt.c_str(), item.key.c_str(), item.c);
-		else if ( !isgraph(item.ch) && item.ch != ' ' )
+		else if ( !iswgraph(item.ch) && item.ch != ' ' )
 			printf(nogfmt.c_str(), item.key.c_str(), item.c);
 		else
 			printf(gphfmt.c_str(), item.ch, item.key.c_str(), item.c);
@@ -144,7 +144,7 @@ void read_text(wstring &data, vector<item_t> &items)
 
 	data.clear();
 	wchar_t ch;
-	while ( wcin.get(ch) )
+	while (wcin.get(ch))
 	{
 		data.push_back(ch);
 		++syms[ch];
@@ -342,7 +342,7 @@ int main(int argc, char *argv[])
 
 		if ( argc > 1 && (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help")) || argc == 1 )
 		{
-			wcout <<
+			(argc == 1 ? wcerr : wcout) <<
 				"Usage: " << argv[0] << " [options]\n"
 				"Options:\n"
 				"  -e             : encode data from stdin and print it to stdout\n"
