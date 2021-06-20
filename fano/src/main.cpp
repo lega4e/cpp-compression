@@ -5,6 +5,7 @@
 #include <functional>
 #include <fstream>
 #include <map>
+#include <memory>
 #include <queue>
 #include <string>
 #include <unordered_map>
@@ -15,10 +16,22 @@
 
 #pragma GCC diagnostic ignored "-Wparentheses"
 
-constexpr unsigned int const CONTROL_NUMBER = 3247928473u;
-
 
 using namespace std;
+
+
+
+
+
+/********************** GLOBAL OBJECTS **********************/
+constexpr unsigned int const CONTROL_NUMBER = 3247928473u;
+
+ifstream *fin                  = nullptr;
+ofstream *fout                 = nullptr;
+basic_ifstream<wchar_t> *wfin  = nullptr;
+basic_ofstream<wchar_t> *wfout = nullptr;
+
+string input_file, output_file;
 
 
 
@@ -92,6 +105,96 @@ bool count_cmp(item_t const &lhs, item_t const &rhs)
 
 
 
+/***************** INPUT AND OUTPUT STREAMS *****************/
+typedef unique_ptr<istream, function<void(istream *)>>                               in_p;
+typedef unique_ptr<ostream, function<void(ostream *)>>                               out_p;
+typedef unique_ptr<basic_istream<wchar_t>, function<void(basic_istream<wchar_t> *)>> win_p;
+typedef unique_ptr<basic_ostream<wchar_t>, function<void(basic_ostream<wchar_t> *)>> wout_p;
+
+in_p input_stream()
+{
+	in_p in(&cin, [](istream *p) {
+		if (p != &cin)
+			delete p;
+	});
+
+	if (!input_file.empty())
+	{
+		in.reset(new ifstream(input_file));
+		if (!*in)
+		{
+			fprintf(stderr, "Error: can't open file '%s'\n", input_file.c_str());
+			throw 1;
+		}
+	}
+
+	return in;
+}
+
+out_p output_stream()
+{
+	out_p out(&cout, [](ostream *p)->void {
+		if (p != &cout)
+			delete p;
+	} );
+
+	if (!output_file.empty())
+	{
+		out.reset(new ofstream(output_file));
+		if (!*out)
+		{
+			fprintf(stderr, "Error: can't open file '%s'\n", output_file.c_str());
+			throw 1;
+		}
+	}
+
+	return out;
+}
+
+win_p winput_stream()
+{
+	win_p win(&wcin, [](basic_istream<wchar_t> *p) -> void {
+		if (p != &wcin)
+			delete p;
+	});
+
+	if (!input_file.empty())
+	{
+		win.reset(new basic_ifstream<wchar_t>(input_file));
+		if (!*win)
+		{
+			fprintf(stderr, "Error: can't open file '%s'\n", input_file.c_str());
+			throw 1;
+		}
+	}
+
+	return win;
+}
+
+wout_p woutput_stream()
+{
+	wout_p wout(&wcout, [](basic_ostream<wchar_t> *p)->void {
+		if (p != &wcout)
+			delete p;
+	} );
+
+	if (!output_file.empty())
+	{
+		wout.reset(new basic_ofstream<wchar_t>(output_file));
+		if (!*wout)
+		{
+			fprintf(stderr, "Error: can't open file '%s'\n", output_file.c_str());
+			throw 1;
+		}
+	}
+
+	return wout;
+}
+
+
+
+
+
 /******************** ASSISTIVE FUNCTIONS *******************/
 void check_control_number(nvx::archive<istream> &arch)
 {
@@ -144,7 +247,8 @@ void read_text(wstring &data, vector<item_t> &items)
 
 	data.clear();
 	wchar_t ch;
-	while (wcin.get(ch))
+	auto win = winput_stream();
+	while (win->get(ch))
 	{
 		data.push_back(ch);
 		++syms[ch];
@@ -246,7 +350,8 @@ void encode()
 	calculate_keys(items);
 	data2bitfield(data, items, bits);
 
-	nvx::archive(&cout) <<
+	auto out = output_stream();
+	nvx::archive(out.get()) <<
 		nvx::R<unsigned int>(CONTROL_NUMBER) <<
 		&items << &bits;
 
@@ -263,13 +368,15 @@ void decode()
 	nvx::BitField  bits;
 
 	{
-		nvx::archive arch(&cin);
+		auto in = input_stream();
+		nvx::archive arch(in.get());
 		check_control_number(arch);
 		arch >> &items >> &bits;
 	}
 
 	sort( items.begin(), items.end(), key_cmp );
 
+	auto wout = woutput_stream();
 	int bitn = 0;
 	string key;
 	vector<item_t>::const_iterator it;
@@ -289,7 +396,7 @@ void decode()
 			);
 		}
 		while ( it->key != key );
-		wcout.put(it->ch);
+		wout->put(it->ch);
 	}
 
 	return;
@@ -304,62 +411,109 @@ int main(int argc, char *argv[])
 {
 	setlocale(LC_ALL, "");
 
+	char action = 0;
+
+	// parse options
+	for (int i = 1; i < argc; ++i)
+	{
+		if ( !strcmp(argv[i], "-e") )
+			action = 'e';
+		else if ( !strcmp(argv[i], "-d") )
+			action = 'd';
+		else if ( !strcmp(argv[i], "-h") || !strcmp(argv[i], "--help") )
+			action = 'h';
+		else if ( !strcmp(argv[i], "--keys-encoded") )
+			action = 'E';
+		else if ( !strcmp(argv[i], "--keys-origin") )
+			action = 'O';
+		else if ( !strcmp(argv[i], "-i") )
+		{
+			if ( ++i >= argc )
+			{
+				fprintf(stderr, "Error: required argument for '-i'\n");
+				return 1;
+			}
+
+			input_file = argv[i];
+		}
+		else if ( !strcmp(argv[i], "-o") )
+		{
+			if ( ++i >= argc )
+			{
+				fprintf(stderr, "Error: required argument for '-o'\n");
+				return 1;
+			}
+
+			output_file = argv[i];
+		}
+		else
+		{
+			cerr << "Unknown option: '" << argv[i] << "'; try -h for usage" << endl;
+			return 1;
+		}
+	}
+
+
+	// work
 	try
 	{
-		if ( argc > 1 && !strcmp(argv[1], "-e") )
+		switch (action)
 		{
+		case 'e':
 			encode();
-			return 0;
-		}
+			break;
 
-		if ( argc > 1 && !strcmp(argv[1], "-d") )
-		{
+		case 'd':
 			decode();
-			return 0;
-		}
+			break;
 
-		if ( argc > 1 && !strcmp(argv[1], "--keys-encoded") )
-		{
+		case 'E':
+		  {
 			vector<item_t> items;
-			nvx::archive   arch(&cin);
+			auto in = input_stream();
+			nvx::archive arch(in.get());
 			check_control_number(arch);
 			arch >> &items;
 			sort(items.rbegin(), items.rend(), count_cmp);
 			print_items(items);
-			return 0;
-		}
+			break;
+		  }
 
-		if ( argc > 1 && !strcmp(argv[1], "--keys-origin") )
-		{
+		case 'D':
+		  {
 			vector<item_t> items;
 			wstring        data;
 			read_text(data, items);
 			calculate_keys(items);
 			sort(items.rbegin(), items.rend(), count_cmp);
 			print_items(items);
-			return 0;
-		}
+			break;
+		  }
 
-		if ( argc > 1 && (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help")) || argc == 1 )
-		{
-			(argc == 1 ? wcerr : wcout) <<
+		case 'h': case 0:
+			(action == 0 ? cerr : cout) <<
 				"Usage: " << argv[0] << " [options]\n"
 				"Options:\n"
-				"  -e             : encode data from stdin and print it to stdout\n"
-				"  -d             : decode data from stdin and print it to stdout\n"
+				"  -h, --help     : show this\n" <<
+				"  -e             : encode data\n"
+				"  -d             : decode data\n"
+				"  -i <file>      : set input file\n"
+				"  -o <file>      : set output file\n"
 				"  --keys-encoded : read encoded data and print keys\n"
-				"  --keys-origin  : read original data, calculate keys and print it\n" <<
-				"  -h, --help     : show this" <<
+				"  --keys-origin  : read original data, calculate keys and print it" <<
 			endl;
-			return 0;
-		}
+			break;
 
-		wcout << "Invalid input: " << argv[1] << endl;
+		}
 	}
 	catch (char const *err)
 	{
 		fprintf(stderr, "%s\n", err);
 		return 1;
+	}
+	catch (int errcode)
+	{
+		return errcode;
 	}
 
 

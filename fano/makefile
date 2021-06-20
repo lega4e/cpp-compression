@@ -1,4 +1,4 @@
-cflags  := -std=gnu++17 -c -Wall -Ofast
+cflags  := -std=gnu++17 -c -Wall -g3
 ldflags :=
 libs    :=
 
