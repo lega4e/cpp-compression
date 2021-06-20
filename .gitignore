@@ -1,8 +1,10 @@
 .*
 main
+huff
 target
 *.o
 input
 output
 tests
 io
+test.sh
