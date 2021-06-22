@@ -118,9 +118,56 @@ void rle_encode(vector<uint8_t> const &src, vector<uint8_t> &target)
 	return;
 }
 
-void rle_decode(istream &in, ostream &out)
+void rle_decode(vector<uint8_t> const &src, vector<uint8_t> &target)
 {
+	uint8_t ctl;
+	uint8_t ch;
+	int     count;
+	for (auto b = src.begin(), e = src.end(); b != e;)
+	{
+		ctl = *b, ++b;
+		count = ctl & ((1 << 7) - 1);
+		if (ctl & (1 << 7))
+		{
+			count += 2;
+			if (b == e)
+				throw "Decode error";
+
+			ch = *b;
+			for (int i = 0; i < count; ++i)
+				target.push_back(ch);
+			++b;
+		}
+		else
+		{
+			count += 1;
+			while (count && b != e)
+			{
+				target.push_back(*b);
+				--count, ++b;
+			}
+
+			if (count)
+				throw "Decode error";
+		}
+	}
+
 	return;
+}
+
+template<typename T>
+bool equal(vector<T> const &lhs, vector<T> const &rhs)
+{
+	if (lhs.size() != rhs.size())
+		return false;
+
+	for (int i = 0; i < (int)lhs.size(); ++i)
+	{
+		if (lhs[i] != rhs[i])
+			return false;
+	}
+
+	return true;
 }
 
 
@@ -130,16 +177,32 @@ void rle_decode(istream &in, ostream &out)
 // main
 int main( int argc, char *argv[] )
 {
-	vector<uint8_t> src = {
-		'a', 'a', 'a', 'a',
-		'b', 'a', 'b', 'e', 'e',
-		'a'
-	};
 
-	vector<uint8_t> target;
-	rle_encode(src, target);
+	try
+	{
+		vector<uint8_t> org = {
+			'a', 'b', 'c', 'd', 'e',
+			'a', 'a', 'a', 'a', 'b',
+			'b', 'a', 'b', 'e', 'e', 'e',
+			'a', 'a', 'a', 'a', 'a', 'd', 'c'
+		};
 
-	cout.write((char const *)target.data(), target.size());
+		vector<uint8_t> enc, dec;
+		rle_encode(org, enc);
+		rle_decode(enc, dec);
+
+		for (uint8_t b : dec)
+			cout << b << " ";
+		cout << endl;
+
+		cout << (equal(org, dec) ? "Equal"s : "Not equal"s) << endl;
+	}
+	catch (char const *err)
+	{
+		fprintf(stderr, "%s\n", err);
+	}
+
+
 
 	return 0;
 }
