@@ -18,7 +18,8 @@ re: clean build
 rerun: clean run
 
 
-source_dirs     := . src
+source_dirs     := src
+header_dirs     := lib
 search_wildcard := $(wildcard $(addsuffix /*.cpp,$(source_dirs)))
 object_files    := $(patsubst %.cpp,%.o,$(search_wildcard))
 object_files    := $(notdir $(object_files))
@@ -32,7 +33,7 @@ main: ./target $(object_files)
 	if ! [ -d ./target ]; then mkdir target; fi
 
 target/%.o: %.cpp
-	g++ $(cflags) -o $@ -MD $(addprefix -I,$(source_dirs)) $<
+	g++ $(cflags) -o $@ -MD $(addprefix -I,$(header_dirs)) $<
 
 include $(wildcard target/*.d)
 

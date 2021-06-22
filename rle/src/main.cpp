@@ -3,8 +3,18 @@
 #include <fstream>
 #include <vector>
 
+#include <nvx/random.hpp>
 
+
+using namespace nvx;
 using namespace std;
+
+
+
+
+
+// objects
+NVX_DRE;
 
 
 
@@ -80,7 +90,7 @@ void rle_encode(vector<uint8_t> const &src, vector<uint8_t> &target)
 			break;
 
 		case 'r':
-			if (b != e && *b == ps)
+			if (b != e && *b == ps && count < 129)
 			{
 				++count;
 				break;
@@ -93,20 +103,23 @@ void rle_encode(vector<uint8_t> const &src, vector<uint8_t> &target)
 			break;
 
 		case 'u':
-			if (b != e && *b != ps)
+			if (b != e && *b != ps && count < 128)
 			{
 				++count;
 				break;
 			}
 
-			if (b != e)
+			if (b != e && *b == ps)
 				--count;
 
 			target.push_back(uint8_t(count-1));
 			target.resize((int)target.size() + count);
-			memcpy( (target.end() - count).base(), (b - count - (b == e ? 0 : 1)).base(), count );
-			stage = 'r';
-			count = 2;
+			memcpy( (target.end() - count).base(), (b - count - (b == e || count == 128 ? 0 : 1)).base(), count );
+
+			if (count == 128)
+				stage = '\0', count = 1;
+			else
+				stage = 'r', count = 2;
 			break;
 
 		}
@@ -170,6 +183,32 @@ bool equal(vector<T> const &lhs, vector<T> const &rhs)
 	return true;
 }
 
+vector<uint8_t> random_vector(int seqcount = 10)
+{
+	vector<uint8_t> res;
+	char            st;
+	uint8_t         ch;
+
+	while (seqcount--)
+	{
+		st = disD()(dre) > 0.5 ? 'r' : 'u';
+
+		if (st == 'r')
+		{
+			ch = rnd('a', 'z');
+			for (int i = 0, e = rnd(2, 500); i != e; ++i)
+				res.push_back(ch);
+		}
+		else 
+		{
+			for (int i = 0, e = rnd(1, 500); i != e; ++i)
+			res.push_back(rnd('a', 'z'));
+		}
+	}
+
+	return res;
+}
+
 
 
 
@@ -180,20 +219,16 @@ int main( int argc, char *argv[] )
 
 	try
 	{
-		vector<uint8_t> org = {
-			'a', 'b', 'c', 'd', 'e',
-			'a', 'a', 'a', 'a', 'b',
-			'b', 'a', 'b', 'e', 'e', 'e',
-			'a', 'a', 'a', 'a', 'a', 'd', 'c'
-		};
-
+		vector<uint8_t> org = random_vector();
 		vector<uint8_t> enc, dec;
 		rle_encode(org, enc);
 		rle_decode(enc, dec);
 
-		for (uint8_t b : dec)
-			cout << b << " ";
-		cout << endl;
+		/*
+		 * for (uint8_t b : dec)
+		 *     cout << b << " ";
+		 * cout << endl;
+		 */
 
 		cout << (equal(org, dec) ? "Equal"s : "Not equal"s) << endl;
 	}
