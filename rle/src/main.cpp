@@ -218,10 +218,7 @@ void rle_decode(uint8_t const *b, uint8_t const *e, vector<uint8_t> &target)
 
 			ch = readsym(b, &chlen);
 			for (int i = 0; i < count; ++i)
-			{
-				for (int j = 0; j < chlen; ++j)
-					target.push_back( *((uint8_t *)&ch + j) );
-			}
+				writesym((uint8_t *)&ch, target, &chlen);
 			b += chlen;
 		}
 		else
@@ -230,8 +227,7 @@ void rle_decode(uint8_t const *b, uint8_t const *e, vector<uint8_t> &target)
 			while (count && b < e)
 			{
 				ch = readsym(b, &chlen);
-				for (int j = 0; j < chlen; ++j)
-					target.push_back( *((uint8_t *)&ch + j) );
+				writesym((uint8_t *)&ch, target, &chlen);
 				--count, b += chlen;
 			}
 
@@ -246,21 +242,6 @@ void rle_decode(uint8_t const *b, uint8_t const *e, vector<uint8_t> &target)
 
 
 // testing functions
-template<typename T>
-bool equal(vector<T> const &lhs, vector<T> const &rhs)
-{
-	if (lhs.size() != rhs.size())
-		return false;
-
-	for (int i = 0; i < (int)lhs.size(); ++i)
-	{
-		if (lhs[i] != rhs[i])
-			return false;
-	}
-
-	return true;
-}
-
 vector<uint8_t> random_vector(int seqcount = 10)
 {
 	vector<uint8_t> res;
