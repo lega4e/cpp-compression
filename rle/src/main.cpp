@@ -25,8 +25,36 @@ NVX_DRE;
 
 
 
+// assistive functions
+int charl(uint8_t const *ch)
+{
+	return
+		!(*ch & (1 << 7)) ? 1 :
+		!(*ch & (1 << 5)) ? 2 :
+		!(*ch & (1 << 4)) ? 3 : 4;
+}
 
-// functions
+wchar_t readsym(uint8_t const *src, int *lenp = nullptr)
+{
+	int len    = charl(src);
+	wchar_t ch = 0;
+	memcpy(&ch, src, len);
+	if (lenp)
+		*lenp = len;
+	return ch;
+}
+
+void writesym(uint8_t const *src, vector<uint8_t> &target, int *lenp = nullptr)
+{
+	int len = lenp ? *lenp : charl(src);
+	for (int i = 0; i < len; ++i)
+		target.push_back(src[i]);
+	return;
+}
+
+
+
+// core functions
 /*
  * Последовательность символов преобразуется в последовательность,
  * где символы чередуется с кодирующим байтом; сначала идёт
@@ -66,72 +94,106 @@ NVX_DRE;
  *     и т.д.
  *
  */
-void rle_encode(vector<uint8_t> const &src, vector<uint8_t> &target)
+void rle_encode(uint8_t const *b, uint8_t const *e, vector<uint8_t> &target)
 {
 	target.clear();
-	if (src.empty())
+	if (b == e)
 		return;
 
-	uint8_t ps    = src[0]; // previous symbol
-	int     count = 1;      // repeat count
-	char    stage = '\0';
+	wchar_t s;             // current symbol
+	wchar_t ps;            // previous symbol
+	int     slen   = 0;    // length of current symbol
+	int     pslen  = 0;    // length of previous symbol
+	int     count  = 0;    // count of symbols
+	int     length = 0;    // length of sequence in bytes
+	char    stage  = '\0';
 
-	for (auto b = src.begin()+1, e = src.end(); b != e+1; ++b)
+	auto next_symbol = [&]()->void {
+		ps      = s;
+		pslen   = slen;
+		s       = readsym(b, &slen);
+		b      += slen;
+		count  += 1;
+		length += slen;
+	};
+
+	auto write_repeat = [&](int count, wchar_t sym, int symlen)->void {
+		target.push_back( (1 << 7) | uint8_t(count - 2) );
+		writesym((uint8_t *)&sym, target, &symlen);
+	};
+	
+	auto write_unique = [&](int count, int length, uint8_t const *p)->void {
+		target.push_back(uint8_t(count-1));
+		target.resize((int)target.size() + length);
+		memcpy((target.end() - length).base(), p - length, length);
+	};
+
+	next_symbol();
+	while (b < e+1)
 	{
-	switch_again:
-		switch (stage)
+		if (stage == 'r')
 		{
-		case '\0':
 			if (b == e)
 			{
-				stage = 'u';
-				goto switch_again;
+				write_repeat(count, ps, pslen);
+				++b;
+				continue;
 			}
 
-			++count;
-			if (*b == ps)
-				stage = 'r';
-			else
-				stage = 'u';
-			break;
-
-		case 'r':
-			if (b != e && *b == ps && count < 129)
+			if (count == 129)
 			{
-				++count;
+				write_repeat(count, ps, pslen);
+				count  = 0;
+				length = 0;
+				stage  = '\0';
+				next_symbol();
+				continue;
+			}
+
+			next_symbol();
+			if (s != ps)
+			{
+				write_repeat(count-1, ps, pslen);
+				count = 1;
+				length = slen;
+				stage = '\0';
+				continue;
+			}
+		}
+		else
+		{
+			if (b == e)
+			{
+				write_unique(count, length, b);
 				break;
 			}
-
-			target.push_back( (1 << 7) | uint8_t(count - 2) );
-			target.push_back( ps );
-			count = 1;
-			stage = '\0';
-			break;
-
-		case 'u':
-			if (b != e && *b != ps && count < 128)
-			{
-				++count;
-				break;
-			}
-
-			if (b != e && *b == ps)
-				--count;
-
-			target.push_back(uint8_t(count-1));
-			target.resize((int)target.size() + count);
-			memcpy( (target.end() - count).base(), (b - count - (b == e || count == 128 ? 0 : 1)).base(), count );
 
 			if (count == 128)
-				stage = '\0', count = 1;
-			else
-				stage = 'r', count = 2;
-			break;
+			{
+				write_unique(count, length, b);
+				count  = 0;
+				length = 0;
+				stage  = '\0';
+				next_symbol();
+				continue;
+			}
 
+			next_symbol();
+			if (s == ps)
+			{
+				if (count == 2)
+				{
+					stage = 'r';
+					continue;
+				}
+
+				write_unique(count-2, length-slen-pslen, b-slen-pslen);
+				count   = 2;
+				length  = slen + pslen;
+				stage = 'r';
+				continue;
+			}
 		}
-		
-		if (b != e)
-			ps = *b;
 	}
 
 	return;
@@ -174,6 +236,9 @@ void rle_decode(vector<uint8_t> const &src, vector<uint8_t> &target)
 	return;
 }
 
+
+
+// testing functions
 template<typename T>
 bool equal(vector<T> const &lhs, vector<T> const &rhs)
 {
@@ -215,6 +280,9 @@ vector<uint8_t> random_vector(int seqcount = 10)
 	return res;
 }
 
+
+
+// flag handlings functions
 void print_help(char const *progname)
 {
 	printf(
@@ -343,7 +411,7 @@ int main( int argc, char *argv[] )
 			from.push_back((uint8_t)ch);
 
 		if (cfg.mode == 'e')
-			rle_encode(from, to);
+			rle_encode(from.begin().base(), from.end().base(), to);
 		else
 			rle_decode(from, to);
 	}
