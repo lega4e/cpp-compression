@@ -233,7 +233,7 @@ void print_help(char const *progname)
 
 void print_version()
 {
-	printf("rle v1.0 by nvxden, MIT License\n");
+	printf("rle v1.1 by nvxden, MIT License\n");
 	return;
 }
 
@@ -297,6 +297,18 @@ Cfg handle_flags( int argc, char *argv[] )
 	return Cfg { move(ifname), move(ofname), mode };
 }
 
+FILE *openfile_or_exit(char const *filename, char const *mode)
+{
+	FILE *file = fopen(filename, mode);
+	if (!file)
+	{
+		fprintf(stderr, "Error: can't open file %s\n", filename);
+		exit(1);
+	}
+
+	return file;
+}
+
 
 
 
@@ -322,14 +334,7 @@ int main( int argc, char *argv[] )
 	else try
 	{
 		if (!cfg.ifname.empty())
-		{
-			ifile = fopen(cfg.ifname.c_str(), "r");
-			if (!ifile)
-			{
-				fprintf(stderr, "Error: can't open file %s\n", cfg.ifname.c_str());
-				return 1;
-			}
-		}
+			ifile = openfile_or_exit(cfg.ifname.c_str(), "r");
 
 		vector<uint8_t> from;
 		int ch;
@@ -354,14 +359,7 @@ int main( int argc, char *argv[] )
 
 	// writing result
 	if (!cfg.ofname.empty())
-	{
-		ofile = fopen(cfg.ofname.c_str(), "w");
-		if (!ofile)
-		{
-			fprintf(stderr, "Error: can't open file %s\n", cfg.ofname.c_str());
-			return 1;
-		}
-	}
+		ofile = openfile_or_exit(cfg.ofname.c_str(), "w");
 
 	for (uint8_t ch : to)
 		putc(ch, ofile);
