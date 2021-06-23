@@ -199,33 +199,40 @@ void rle_encode(uint8_t const *b, uint8_t const *e, vector<uint8_t> &target)
 	return;
 }
 
-void rle_decode(vector<uint8_t> const &src, vector<uint8_t> &target)
+void rle_decode(uint8_t const *b, uint8_t const *e, vector<uint8_t> &target)
 {
 	uint8_t ctl;
-	uint8_t ch;
+	wchar_t ch;
+	int     chlen;
 	int     count;
-	for (auto b = src.begin(), e = src.end(); b != e;)
+	while (b < e)
 	{
 		ctl = *b, ++b;
 		count = ctl & ((1 << 7) - 1);
-		if (ctl & (1 << 7))
+
+		if (ctl & (1 << 7)) // repeat
 		{
 			count += 2;
-			if (b == e)
+			if (b >= e)
 				throw "Decode error";
 
-			ch = *b;
+			ch = readsym(b, &chlen);
 			for (int i = 0; i < count; ++i)
-				target.push_back(ch);
-			++b;
+			{
+				for (int j = 0; j < chlen; ++j)
+					target.push_back( *((uint8_t *)&ch + j) );
+			}
+			b += chlen;
 		}
 		else
 		{
 			count += 1;
-			while (count && b != e)
+			while (count && b < e)
 			{
-				target.push_back(*b);
-				--count, ++b;
+				ch = readsym(b, &chlen);
+				for (int j = 0; j < chlen; ++j)
+					target.push_back( *((uint8_t *)&ch + j) );
+				--count, b += chlen;
 			}
 
 			if (count)
@@ -413,7 +420,7 @@ int main( int argc, char *argv[] )
 		if (cfg.mode == 'e')
 			rle_encode(from.begin().base(), from.end().base(), to);
 		else
-			rle_decode(from, to);
+			rle_decode(from.begin().base(), from.end().base(), to);
 	}
 	catch (char const *err)
 	{
