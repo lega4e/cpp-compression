@@ -41,7 +41,7 @@ void find_match(
 	uint8_t const *match = nullptr;
 	for (int clen = 0; b < e; ++b)
 	{
-		for (clen = 0; sb + clen < se && b + clen < e && sb[clen] == b[clen]; ++clen);
+		for (clen = 0; sb + clen < se && sb[clen] == b[clen % (e - b)]; ++clen);
 		if (clen > len)
 			match = b, len = clen;
 		if (len == maxlen)
@@ -104,6 +104,7 @@ void lz77_encode(uint8_t const *b, uint8_t const *e, vector<uint8_t> &target)
 void lz77_decode(uint8_t const *b, uint8_t const *e, vector<uint8_t> &target)
 {
 	int off, len;
+	uint8_t *bufb, *winb;
 	while (b < e)
 	{
 		read_ctl(b, off, len);
@@ -112,11 +113,10 @@ void lz77_decode(uint8_t const *b, uint8_t const *e, vector<uint8_t> &target)
 		if (len)
 		{
 			target.resize(target.size() + len);
-			memcpy(
-				target.end().base() - len,
-				target.end().base() - len - 1 - off,
-				len
-			);
+			winb = target.end().base() - len;
+			bufb = target.end().base() - len - 1 - off;
+			for (int i = 0; i < len; ++i)
+				winb[i] = bufb[i % (off + 1)];
 		}
 
 		target.push_back(*b);
@@ -134,24 +134,25 @@ void lz77_decode(uint8_t const *b, uint8_t const *e, vector<uint8_t> &target)
 int main( int argc, char *argv[] )
 {
 	vector<uint8_t> src = {
-		1, 2, 1, 3, 1, 2, 1,
-		1, 2, 1, 3, 1, 2, 1,
-		3, 1, 2, 1, 1, 1, 0, 0, 0
+		1, 2, 1, 2,
+		1, 2, 1, 2,
+		1, 2, 1, 2
 	};
 
 	vector<uint8_t> enc;
 	vector<uint8_t> dec;
 
 	lz77_encode(src.begin().base(), src.end().base(), enc);
-	lz77_decode(enc.begin().base(), enc.end().base(), dec);
+	// lz77_decode(enc.begin().base(), enc.end().base(), dec);
 
-	for (int i = 0; i < (int)dec.size(); ++i)
-	{
-		cout << (int)dec[i] << ' ';
-		if ((i + 1) % 4 == 0)
-			cout << '\n';
-	}
-	// cout.write((char const *)target.data(), target.size());
+	// for (int i = 0; i < (int)dec.size(); ++i)
+	// {
+		// cout << (int)dec[i] << ' ';
+		// if ((i + 1) % 4 == 0)
+			// cout << '\n';
+	// }
+
+	cout.write((char const *)enc.data(), enc.size());
 
 	return 0;
 }
