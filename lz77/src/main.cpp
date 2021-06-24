@@ -130,29 +130,161 @@ void lz77_decode(uint8_t const *b, uint8_t const *e, vector<uint8_t> &target)
 
 
 
+/************************ FLAG HADING ***********************/
+struct Cfg
+{
+	string ifname, ofname;
+	char mode;
+};
+
+void print_help(char const *progname)
+{
+	printf(
+		"Usage: %s [option]\n"
+		"Options:\n"
+		"  -e, --encode   : encode input\n"
+		"  -d, --decode   : decode input\n"
+		"  -i, --input    : set input file (by default there is stdin)\n"
+		"  -o, --output   : set output file (by default there is stdout)\n"
+		"  -h, --help     : print this help message and exit\n"
+		"  -v, --version  : print version and exit\n",
+		progname
+	);
+}
+
+void print_version()
+{
+	printf("lz77 v0.4 by nvxden, MIT License\n");
+	return;
+}
+
+Cfg handle_flags( int argc, char *argv[] )
+{
+	string ifname, ofname;
+	char mode = 'e';
+
+	for (int i = 1; i < argc; ++i)
+	{
+		if (!strcmp("-e", argv[i]) || !strcmp("--encode", argv[i]))
+			mode = 'e';
+		else if (!strcmp("-d", argv[i]) || !strcmp("--decode", argv[i]))
+			mode = 'd';
+		else if (!strcmp("-i", argv[i]) || !strcmp("--input", argv[i]) || argv[i][0] != '-')
+		{
+			if (argv[i][0] == '-')
+			{
+				++i;
+				if (i >= argc)
+				{
+					fprintf(stderr, "Error: require input file name for option -i\n");
+					exit(1);
+				}
+			}
+
+			ifname = argv[i];
+		}
+		else if (!strcmp("-o", argv[i]) || !strcmp("--output", argv[i]))
+		{
+			++i;
+			if (i >= argc)
+			{
+				fprintf(stderr, "Error: require input file name for option -i\n");
+				exit(1);
+			}
+
+			ofname = argv[i];
+		}
+		else if (!strcmp("-h", argv[i]) || !strcmp("--help", argv[i]))
+		{
+			print_help(argv[0]);
+			mode = 'h';
+			break;
+		}
+		else if (!strcmp("-v", argv[i]) || !strcmp("--version", argv[i]))
+		{
+			print_version();
+			mode = 'v';
+			break;
+		}
+		else
+		{
+			fprintf(stderr, "Error: unknown flag %s\n", argv[i]);
+			exit(1);
+		}
+	}
+
+	return Cfg { move(ifname), move(ofname), mode };
+}
+
+FILE *openfile_or_exit(char const *filename, char const *mode)
+{
+	FILE *file = fopen(filename, mode);
+	if (!file)
+	{
+		fprintf(stderr, "Error: can't open file %s\n", filename);
+		exit(1);
+	}
+
+	return file;
+}
+
+
+
+
+
+
 // main
 int main( int argc, char *argv[] )
 {
-	vector<uint8_t> src = {
-		1, 2, 1, 2,
-		1, 2, 1, 2,
-		1, 2, 1, 2
-	};
+	FILE *ifile = stdin;
+	FILE *ofile = stdout;
 
-	vector<uint8_t> enc;
-	vector<uint8_t> dec;
+	Cfg cfg = handle_flags(argc, argv);
+	if (cfg.mode == 'v' || cfg.mode == 'h')
+		return 0;
 
-	lz77_encode(src.begin().base(), src.end().base(), enc);
-	// lz77_decode(enc.begin().base(), enc.end().base(), dec);
 
-	// for (int i = 0; i < (int)dec.size(); ++i)
-	// {
-		// cout << (int)dec[i] << ' ';
-		// if ((i + 1) % 4 == 0)
-			// cout << '\n';
-	// }
 
-	cout.write((char const *)enc.data(), enc.size());
+	// work
+	vector<uint8_t> to;
+
+	try
+	{
+		if (!cfg.ifname.empty())
+			ifile = openfile_or_exit(cfg.ifname.c_str(), "r");
+
+		vector<uint8_t> from;
+		int ch;
+
+		while ( (ch = getc(ifile)) != EOF )
+			from.push_back((uint8_t)ch);
+
+		if (cfg.mode == 'e')
+			lz77_encode(from.begin().base(), from.end().base(), to);
+		else
+			lz77_decode(from.begin().base(), from.end().base(), to);
+	}
+	catch (char const *err)
+	{
+		fprintf(stderr, "%s\n", err);
+	}
+
+	if (ifile != stdin)
+		fclose(ifile);
+
+
+
+	// writing result
+	if (!cfg.ofname.empty())
+		ofile = openfile_or_exit(cfg.ofname.c_str(), "w");
+
+	for (uint8_t ch : to)
+		putc(ch, ofile);
+
+	if (ofile != stdout)
+		fclose(ofile);
+
+
 
 	return 0;
 }
