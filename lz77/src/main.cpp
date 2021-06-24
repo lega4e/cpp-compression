@@ -1,3 +1,4 @@
+#include <cstring>
 #include <iostream>
 #include <vector>
 
@@ -60,7 +61,7 @@ void write_ctl(vector<uint8_t> &target, int off, int len)
 	return;
 }
 
-void read_ctl(uint8_t *b, int &off, int &len)
+void read_ctl(uint8_t const *b, int &off, int &len)
 {
 	off = *b;
 	*((uint8_t *)&off + 1) = *(b + 1) & ((1 << 4) - 1);
@@ -84,19 +85,42 @@ void lz77_encode(uint8_t const *b, uint8_t const *e, vector<uint8_t> &target)
 	int off = 0;
 	int len = 0;
 
-	auto shift_buffer = [&]()->void {
-		winbeg += len + 1;
-		winend  = min(winend + len+1, e-1);
-		bufend  = min(bufend + len+1, e);
-		bufbeg  = max(bufbeg, bufend - BUFFER_SIZE);
-	};
-
 	while (bufend != e)
 	{
 		find_match(bufbeg, bufend, winbeg, winend, off, len);
 		write_ctl(target, off, len);
 		target.push_back(*(winbeg + len));
-		shift_buffer();
+
+		// shift buffer
+		winbeg += len + 1;
+		winend  = min(winend + len+1, e-1);
+		bufend  = min(bufend + len+1, e);
+		bufbeg  = max(bufbeg, bufend - BUFFER_SIZE);
+	}
+
+	return;
+}
+
+void lz77_decode(uint8_t const *b, uint8_t const *e, vector<uint8_t> &target)
+{
+	int off, len;
+	while (b < e)
+	{
+		read_ctl(b, off, len);
+		b += 2;
+
+		if (len)
+		{
+			target.resize(target.size() + len);
+			memcpy(
+				target.end().base() - len,
+				target.end().base() - len - 1 - off,
+				len
+			);
+		}
+
+		target.push_back(*b);
+		++b;
 	}
 
 	return;
@@ -112,13 +136,22 @@ int main( int argc, char *argv[] )
 	vector<uint8_t> src = {
 		1, 2, 1, 3, 1, 2, 1,
 		1, 2, 1, 3, 1, 2, 1,
-		3, 1, 2, 1, 1, 1
+		3, 1, 2, 1, 1, 1, 0, 0, 0
 	};
 
-	vector<uint8_t> target;
+	vector<uint8_t> enc;
+	vector<uint8_t> dec;
 
-	lz77_encode(src.begin().base(), src.end().base(), target);
-	cout.write((char const *)target.data(), target.size());
+	lz77_encode(src.begin().base(), src.end().base(), enc);
+	lz77_decode(enc.begin().base(), enc.end().base(), dec);
+
+	for (int i = 0; i < (int)dec.size(); ++i)
+	{
+		cout << (int)dec[i] << ' ';
+		if ((i + 1) % 4 == 0)
+			cout << '\n';
+	}
+	// cout.write((char const *)target.data(), target.size());
 
 	return 0;
 }
