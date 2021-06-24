@@ -154,7 +154,7 @@ void print_help(char const *progname)
 
 void print_version()
 {
-	printf("lz77 v0.4 by nvxden, MIT License\n");
+	printf("lz77 v1.0 by nvxden, MIT License\n");
 	return;
 }
 
