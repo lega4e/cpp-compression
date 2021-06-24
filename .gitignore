@@ -1,6 +1,9 @@
 .*
 main
-rle
+rle/rle
+*.dec
+*.enc
+tmp
 huff
 target
 *.o
@@ -10,3 +13,4 @@ tests
 io
 test.sh
 out
+lz77/lz77
